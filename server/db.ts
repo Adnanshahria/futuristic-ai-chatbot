@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, userSettings, conversations, messages, exports, InsertMessage, InsertConversation, InsertUserSettings } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +89,120 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// User Settings queries
+export async function getUserSettings(userId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(userSettings).where(eq(userSettings.userId, userId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function upsertUserSettings(userId: number, settings: Partial<InsertUserSettings>) {
+  const db = await getDb();
+  if (!db) return;
+
+  const existing = await getUserSettings(userId);
+  if (existing) {
+    await db.update(userSettings).set(settings).where(eq(userSettings.userId, userId));
+  } else {
+    await db.insert(userSettings).values({ userId, ...settings });
+  }
+}
+
+// Conversation queries
+export async function createConversation(userId: number, title?: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.insert(conversations).values({
+    userId,
+    title: title || "New Conversation",
+  });
+  
+  return result;
+}
+
+export async function getConversations(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(conversations)
+    .where(eq(conversations.userId, userId))
+    .orderBy((c) => c.updatedAt);
+}
+
+export async function getConversation(conversationId: number, userId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(conversations)
+    .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)))
+    .limit(1);
+  
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function updateConversationTitle(conversationId: number, title: string) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.update(conversations).set({ title }).where(eq(conversations.id, conversationId));
+}
+
+export async function deleteConversation(conversationId: number) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.delete(conversations).where(eq(conversations.id, conversationId));
+}
+
+// Message queries
+export async function createMessage(message: InsertMessage) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.insert(messages).values(message);
+  return result;
+}
+
+export async function getMessages(conversationId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(messages)
+    .where(eq(messages.conversationId, conversationId))
+    .orderBy((m) => m.createdAt);
+}
+
+export async function updateMessage(messageId: number, updates: Partial<InsertMessage>) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.update(messages).set(updates).where(eq(messages.id, messageId));
+}
+
+// Export queries
+export async function createExport(userId: number, conversationId: number, format: "pdf" | "markdown", fileUrl: string, fileName: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.insert(exports).values({
+    userId,
+    conversationId,
+    format,
+    fileUrl,
+    fileName,
+  });
+  
+  return result;
+}
+
+export async function getExports(userId: number, conversationId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(exports)
+    .where(and(eq(exports.userId, userId), eq(exports.conversationId, conversationId)))
+    .orderBy((e) => e.createdAt);
+}
