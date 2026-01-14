@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aether AI - Futuristic Reasoning Chatbot</title>
+    <meta name="description"
+        content="Advanced AI Reasoning Chatbot powered by Gemini API with structured responses and real-time thinking status">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0a0f1a 0%, #1a1f2e 50%, #0d1117 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+
+        .container {
+            text-align: center;
+            padding: 2rem;
+            max-width: 600px;
+        }
+
+        .logo {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
+        h1 {
+            font-family: 'Orbitron', monospace;
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d4ff, #7c3aed, #f472b6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 1rem;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .card h2 {
+            color: #00d4ff;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+        }
+
+        .card p {
+            color: #cbd5e1;
+            line-height: 1.6;
+        }
+
+        .features {
+            display: grid;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .feature {
+            background: rgba(0, 212, 255, 0.1);
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: left;
+        }
+
+        .feature-icon {
+            font-size: 1.5rem;
+            margin-right: 0.5rem;
+        }
+
+        .btn {
+            display: inline-block;
+            background: linear-gradient(90deg, #00d4ff, #7c3aed);
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 600;
+            margin-top: 1rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.3);
+        }
+
+        .note {
+            color: #64748b;
+            font-size: 0.9rem;
+            margin-top: 2rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="logo">🤖</div>
+        <h1>Aether AI</h1>
+        <p class="subtitle">Advanced Reasoning Chatbot with Gemini API</p>
+
+        <div class="card">
+            <h2>⚠️ Full-Stack Application</h2>
+            <p>This is a full-stack application that requires a Node.js server to run. GitHub Pages only supports static
+                files.</p>
+        </div>
+
+        <div class="features">
+            <div class="feature">
+                <span class="feature-icon">🧠</span>
+                <strong>Structured Reasoning</strong> - Step-by-step thinking with GOALS, CONSTRAINTS, PROCESS
+            </div>
+            <div class="feature">
+                <span class="feature-icon">⚡</span>
+                <strong>Real-time Thinking</strong> - Visual indicators showing AI reasoning stages
+            </div>
+            <div class="feature">
+                <span class="feature-icon">🔐</span>
+                <strong>Secure Auth</strong> - Supabase authentication with email/password
+            </div>
+        </div>
+
+        <a href="https://github.com/Adnanshahria/futuristic-ai-chatbot" class="btn">View on GitHub</a>
+
+        <p class="note">To run this app, clone the repo and run <code>pnpm install && pnpm dev</code></p>
+    </div>
+</body>
+
+</html>
