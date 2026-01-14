@@ -1,14 +1,15 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { ChatInterface } from "@/components/ChatInterface";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { ConversationSidebar } from "@/components/ConversationSidebar";
-import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
 export default function Home() {
+  const [, navigate] = useLocation();
   const { user, loading, isAuthenticated, logout } = useAuth();
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -63,10 +64,10 @@ export default function Home() {
             Experience structured, step-by-step reasoning with real-time thinking status indicators.
           </p>
           <Button
-            onClick={() => (window.location.href = getLoginUrl())}
+            onClick={() => navigate("/login")}
             className="w-full bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-600 hover:to-purple-600"
           >
-            Sign In with Manus
+            Sign In / Create Account
           </Button>
         </div>
       </div>

@@ -1,15 +1,93 @@
-import { COOKIE_NAME } from "@shared/const";
+import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { supabaseAdmin } from "./_core/supabase";
 import { z } from "zod";
 import * as db from "./db";
 import { callGeminiAPI, generateThinkingStatus } from "./gemini";
+import { TRPCError } from "@trpc/server";
+import * as jose from "jose";
 
 export const appRouter = router({
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
+
+    login: publicProcedure
+      .input(z.object({
+        email: z.string().email(),
+        password: z.string().min(6),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!supabaseAdmin) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Auth service not configured" });
+        }
+
+        const { data, error } = await supabaseAdmin.auth.signInWithPassword({
+          email: input.email,
+          password: input.password,
+        });
+
+        if (error || !data.user) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: error?.message || "Invalid credentials" });
+        }
+
+        // Upsert user in our database
+        const openId = data.user.id;
+        await db.upsertUser({
+          openId,
+          email: data.user.email,
+          name: data.user.user_metadata?.name || data.user.email?.split("@")[0],
+          lastSignedIn: new Date(),
+        });
+
+        // Get user from database
+        const dbUser = await db.getUserByOpenId(openId);
+        if (!dbUser) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create user" });
+        }
+
+        // Create session token
+        const secret = new TextEncoder().encode(process.env.JWT_SECRET || "your-secret-key-change-me");
+        const token = await new jose.SignJWT({ openId, userId: dbUser.id })
+          .setProtectedHeader({ alg: "HS256" })
+          .setExpirationTime("1y")
+          .sign(secret);
+
+        // Set session cookie
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, token, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+
+        return { success: true, user: dbUser };
+      }),
+
+    register: publicProcedure
+      .input(z.object({
+        email: z.string().email(),
+        password: z.string().min(6),
+        name: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        if (!supabaseAdmin) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Auth service not configured" });
+        }
+
+        const { data, error } = await supabaseAdmin.auth.signUp({
+          email: input.email,
+          password: input.password,
+          options: {
+            data: { name: input.name },
+          },
+        });
+
+        if (error) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+        }
+
+        return { success: true, message: "Account created successfully" };
+      }),
+
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
@@ -144,7 +222,7 @@ export const appRouter = router({
         if (input.topP !== undefined) settingsData.topP = input.topP.toString();
         if (input.topK !== undefined) settingsData.topK = input.topK;
         if (input.maxOutputTokens !== undefined) settingsData.maxOutputTokens = input.maxOutputTokens;
-        
+
         await db.upsertUserSettings(ctx.user.id, settingsData);
         return { success: true };
       })

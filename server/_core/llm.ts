@@ -1,5 +1,9 @@
 import { ENV } from "./env";
 
+// Gemini API key - read from environment variable
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+console.log("[LLM] Gemini API Key configured:", GEMINI_API_KEY ? "Yes (length: " + GEMINI_API_KEY.length + ")" : "No");
+
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
 export type TextContent = {
@@ -19,7 +23,7 @@ export type FileContent = {
   type: "file_url";
   file_url: {
     url: string;
-    mime_type?: "audio/mpeg" | "audio/wav" | "application/pdf" | "audio/mp4" | "video/mp4" ;
+    mime_type?: "audio/mpeg" | "audio/wav" | "application/pdf" | "audio/mp4" | "video/mp4";
   };
 };
 
@@ -209,14 +213,13 @@ const normalizeToolChoice = (
   return toolChoice;
 };
 
-const resolveApiUrl = () =>
-  ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-    ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
-    : "https://forge.manus.im/v1/chat/completions";
+// Use the embedded Gemini API key
+const getApiKey = () => GEMINI_API_KEY;
 
 const assertApiKey = () => {
-  if (!ENV.forgeApiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is not configured");
   }
 };
 
@@ -270,63 +273,110 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
 
   const {
     messages,
-    tools,
-    toolChoice,
-    tool_choice,
-    outputSchema,
-    output_schema,
-    responseFormat,
-    response_format,
   } = params;
 
+  const apiKey = getApiKey();
+  const model = "gemini-2.0-flash";
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+  // Convert messages to Gemini format
+  const geminiContents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
+  let systemInstruction = "";
+
+  for (const message of messages) {
+    const normalizedMsg = normalizeMessage(message);
+    const textContent = typeof normalizedMsg.content === "string"
+      ? normalizedMsg.content
+      : Array.isArray(normalizedMsg.content)
+        ? normalizedMsg.content.map(p => (p as TextContent).text || JSON.stringify(p)).join("\n")
+        : "";
+
+    if (normalizedMsg.role === "system") {
+      systemInstruction = textContent;
+    } else {
+      geminiContents.push({
+        role: normalizedMsg.role === "assistant" ? "model" : "user",
+        parts: [{ text: textContent }],
+      });
+    }
+  }
+
+  // Build Gemini API request payload
   const payload: Record<string, unknown> = {
-    model: "gemini-2.5-flash",
-    messages: messages.map(normalizeMessage),
+    contents: geminiContents,
+    generationConfig: {
+      temperature: 0.7,
+      topK: 40,
+      topP: 0.95,
+      maxOutputTokens: 8192,
+    },
   };
 
-  if (tools && tools.length > 0) {
-    payload.tools = tools;
+  // Add system instruction if present
+  if (systemInstruction) {
+    payload.systemInstruction = {
+      parts: [{ text: systemInstruction }],
+    };
   }
 
-  const normalizedToolChoice = normalizeToolChoice(
-    toolChoice || tool_choice,
-    tools
-  );
-  if (normalizedToolChoice) {
-    payload.tool_choice = normalizedToolChoice;
-  }
+  console.log("[Gemini] Calling API with model:", model);
 
-  payload.max_tokens = 32768
-  payload.thinking = {
-    "budget_tokens": 128
-  }
-
-  const normalizedResponseFormat = normalizeResponseFormat({
-    responseFormat,
-    response_format,
-    outputSchema,
-    output_schema,
-  });
-
-  if (normalizedResponseFormat) {
-    payload.response_format = normalizedResponseFormat;
-  }
-
-  const response = await fetch(resolveApiUrl(), {
+  const response = await fetch(apiUrl, {
     method: "POST",
     headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
+      "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
+    console.error("[Gemini] API error:", response.status, errorText);
     throw new Error(
-      `LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`
+      `Gemini API invoke failed: ${response.status} ${response.statusText} – ${errorText}`
     );
   }
 
-  return (await response.json()) as InvokeResult;
+  const geminiResponse = await response.json() as {
+    candidates?: Array<{
+      content?: {
+        parts?: Array<{ text?: string }>;
+        role?: string;
+      };
+      finishReason?: string;
+    }>;
+    usageMetadata?: {
+      promptTokenCount?: number;
+      candidatesTokenCount?: number;
+      totalTokenCount?: number;
+    };
+  };
+
+  console.log("[Gemini] Response received successfully");
+
+  // Convert Gemini response to expected format
+  const content = geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+  const result: InvokeResult = {
+    id: `gemini-${Date.now()}`,
+    created: Math.floor(Date.now() / 1000),
+    model: model,
+    choices: [
+      {
+        index: 0,
+        message: {
+          role: "assistant",
+          content: content,
+        },
+        finish_reason: geminiResponse.candidates?.[0]?.finishReason || "stop",
+      },
+    ],
+    usage: geminiResponse.usageMetadata ? {
+      prompt_tokens: geminiResponse.usageMetadata.promptTokenCount || 0,
+      completion_tokens: geminiResponse.usageMetadata.candidatesTokenCount || 0,
+      total_tokens: geminiResponse.usageMetadata.totalTokenCount || 0,
+    } : undefined,
+  };
+
+  return result;
 }
