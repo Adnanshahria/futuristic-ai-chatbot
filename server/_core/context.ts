@@ -3,6 +3,7 @@ import type { User } from "../../drizzle/schema";
 import { COOKIE_NAME } from "@shared/const";
 import * as jose from "jose";
 import * as db from "../db";
+import { userCache } from "./cache";
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
@@ -20,12 +21,22 @@ export async function createContext(
 
     if (token) {
       const secret = new TextEncoder().encode(process.env.JWT_SECRET || "your-secret-key-change-me");
-
       const { payload } = await jose.jwtVerify(token, secret);
 
       if (payload.openId && typeof payload.openId === "string") {
-        const dbUser = await db.getUserByOpenId(payload.openId);
-        user = dbUser as User | null;
+        // Check cache first (fast path)
+        const cached = userCache.get(`user:${payload.openId}`);
+        if (cached) {
+          user = cached as User;
+        } else {
+          // Fallback to database
+          const dbUser = await db.getUserByOpenId(payload.openId);
+          if (dbUser) {
+            // Cache for future requests
+            userCache.set(`user:${payload.openId}`, dbUser as any);
+            user = dbUser as User;
+          }
+        }
       }
     }
   } catch {
@@ -38,4 +49,3 @@ export async function createContext(
     user,
   };
 }
-

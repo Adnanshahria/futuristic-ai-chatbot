@@ -2,7 +2,6 @@ import { ENV } from "./env";
 
 // Gemini API key - read from environment variable
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-console.log("[LLM] Gemini API Key configured:", GEMINI_API_KEY ? "Yes (length: " + GEMINI_API_KEY.length + ")" : "No");
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
